@@ -34,10 +34,10 @@ export default function Post({post}:PostProps){
 }
 
 export const getServerSideProps:GetServerSideProps = async ({req, params}:any) => {
-    const session:any = await getSession({req});
+
     const { slug } = params;
 
-    if(session?.activeSubscription){
+    if(!req?.session?.activeSubscription){
         return{
             redirect:{
                 destination:'/',
@@ -47,20 +47,29 @@ export const getServerSideProps:GetServerSideProps = async ({req, params}:any) =
     }
 
     const prismic = getPrismicClient(req);
-    const response:any = await prismic.getByUID('publication', String(slug),{});
-    const post = {
-        slug,
-        title:RichText.asText(response.data.title),
-        content: RichText.asHtml(response.data.content),
-        updatedAt: new Date(response.last_publication_date).toLocaleDateString('pt-BR',{
-            day: '2-digit',
-            month:'long',
-            year:'numeric'
-        })
-    }
-    return {
-        props:{
-            post
-        }
+    try {
+        const response:any = await prismic.getByUID('publication', String(slug), {});
+        const post = {
+            slug,
+            title: RichText.asText(response.data.title),
+            content: RichText.asHtml(response.data.content.splice(0, 3)),
+            updatedAt: new Date(response.last_publication_date).toLocaleDateString('pt-BR', {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric'
+            })
+        };
+        return {
+            props: {
+                post
+            },
+            revalidate: 60 * 30 // 30 minutos
+        };
+    } catch (error) {
+        console.error('Error fetching document:', error);
+        // Handle the error or return an error page
+        return {
+            notFound: true
+        };
     }
 }
